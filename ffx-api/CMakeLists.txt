@@ -36,6 +36,20 @@ if (FFX_API_BACKEND STREQUAL DX12_X64 OR
 	set(FFX_PLATFORM_NAME dx12)
 endif()
 
+# The component libraries under sdk/ are named with the target architecture, which
+# the Visual Studio generators happen to carry in CMAKE_GENERATOR_PLATFORM. Ninja
+# leaves that empty, so the architecture is derived from the backend selection
+# instead and the link lines below use it.
+if (FFX_API_BACKEND STREQUAL VK_X64 OR FFX_API_BACKEND STREQUAL DX12_X64)
+	set(FFX_TARGET_ARCH x64)
+elseif (FFX_API_BACKEND STREQUAL DX12_ARM64)
+	set(FFX_TARGET_ARCH arm64)
+elseif (FFX_API_BACKEND STREQUAL DX12_ARM64EC)
+	set(FFX_TARGET_ARCH arm64ec)
+else()
+	message(FATAL_ERROR "Cannot derive a target architecture from FFX_API_BACKEND=${FFX_API_BACKEND}")
+endif()
+
 project(FFX_API_${FFX_PLATFORM_NAME})
 
 set(CMAKE_CXX_STANDARD 17)
@@ -141,10 +155,10 @@ set(FFX_AUTO_COMPILE_SHADERS ON)
 set(FFX_BUILD_AS_DLL OFF)
 add_subdirectory(../sdk sdk)
 
-target_link_libraries(amd_fidelityfx_${FFX_PLATFORM_NAME} PRIVATE ffx_fsr2_${CMAKE_GENERATOR_PLATFORM} ffx_fsr3upscaler_${CMAKE_GENERATOR_PLATFORM} ffx_opticalflow_${CMAKE_GENERATOR_PLATFORM} ffx_frameinterpolation_${CMAKE_GENERATOR_PLATFORM} DXGI)
+target_link_libraries(amd_fidelityfx_${FFX_PLATFORM_NAME} PRIVATE ffx_fsr2_${FFX_TARGET_ARCH} ffx_fsr3upscaler_${FFX_TARGET_ARCH} ffx_opticalflow_${FFX_TARGET_ARCH} ffx_frameinterpolation_${FFX_TARGET_ARCH} DXGI)
 if (FFX_API_BACKEND STREQUAL VK_X64)
 	find_package(Vulkan REQUIRED)
-	target_link_libraries(amd_fidelityfx_${FFX_PLATFORM_NAME} PRIVATE Vulkan::Headers ffx_backend_vk_${CMAKE_GENERATOR_PLATFORM})
+	target_link_libraries(amd_fidelityfx_${FFX_PLATFORM_NAME} PRIVATE Vulkan::Headers ffx_backend_vk_${FFX_TARGET_ARCH})
 else() # DX12
-	target_link_libraries(amd_fidelityfx_${FFX_PLATFORM_NAME} PRIVATE D3D12 ffx_backend_dx12_${CMAKE_GENERATOR_PLATFORM})
+	target_link_libraries(amd_fidelityfx_${FFX_PLATFORM_NAME} PRIVATE D3D12 ffx_backend_dx12_${FFX_TARGET_ARCH})
 endif()
