@@ -37,6 +37,13 @@ function(compile_shaders_with_depfile
 	SHADER_FILES OUTPUT_PATH
 	PERMUTATION_OUTPUTS)
 
+	# PERMUTATION_OUTPUTS holds the CALLER'S VARIABLE NAME, not a list. Appending to
+	# it put that name into the list as its first element, and the caller then handed
+	# the whole thing to add_custom_target(... DEPENDS), where the name is a file that
+	# no rule produces. MSBuild ignores such a dependency; Ninja refuses to build.
+	# The headers accumulate in a local list instead, and only that is returned.
+	set(_FFX_PERMUTATION_OUTPUTS )
+
 	#message(STATUS "OUTPUT_PATH=${OUTPUT_PATH}")
 	#message(STATUS "EXE=${EXECUTABLE}")
 	#message(STATUS "BASE=${BASE_ARGS}")
@@ -94,7 +101,7 @@ function(compile_shaders_with_depfile
 			DEPENDS ${PASS_SHADER}
 			DEPFILE ${WAVE32_PERMUTATION_HEADER}.d
 		)
-		list(APPEND PERMUTATION_OUTPUTS ${WAVE32_PERMUTATION_HEADER})
+		list(APPEND _FFX_PERMUTATION_OUTPUTS ${WAVE32_PERMUTATION_HEADER})
 
 		# Wave64
 		add_custom_command(
@@ -104,7 +111,7 @@ function(compile_shaders_with_depfile
 			DEPENDS ${PASS_SHADER}
 			DEPFILE ${WAVE64_PERMUTATION_HEADER}.d
 		)
-		list(APPEND PERMUTATION_OUTPUTS ${WAVE64_PERMUTATION_HEADER})
+		list(APPEND _FFX_PERMUTATION_OUTPUTS ${WAVE64_PERMUTATION_HEADER})
 
 		# Wave32 16-bit
 		add_custom_command(
@@ -114,7 +121,7 @@ function(compile_shaders_with_depfile
 			DEPENDS ${PASS_SHADER}
 			DEPFILE ${WAVE32_16BIT_PERMUTATION_HEADER}.d
 		)
-		list(APPEND PERMUTATION_OUTPUTS ${WAVE32_16BIT_PERMUTATION_HEADER})
+		list(APPEND _FFX_PERMUTATION_OUTPUTS ${WAVE32_16BIT_PERMUTATION_HEADER})
 
 		# Wave64 16-bit
 		add_custom_command(
@@ -124,10 +131,10 @@ function(compile_shaders_with_depfile
 			DEPENDS ${PASS_SHADER}
 			DEPFILE ${WAVE64_16BIT_PERMUTATION_HEADER}.d
 		)
-		list(APPEND PERMUTATION_OUTPUTS ${WAVE64_16BIT_PERMUTATION_HEADER})
+		list(APPEND _FFX_PERMUTATION_OUTPUTS ${WAVE64_16BIT_PERMUTATION_HEADER})
 	endforeach(PASS_SHADER)
 
-	set(${PERMUTATION_OUTPUTS} ${PERMUTATION_OUTPUTS} PARENT_SCOPE)
+	set(${PERMUTATION_OUTPUTS} ${_FFX_PERMUTATION_OUTPUTS} PARENT_SCOPE)
 endfunction()
 
 # macro to add shader output files to a list for dependencies
