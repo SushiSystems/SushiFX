@@ -1529,7 +1529,14 @@ FfxErrorCode CreateBackendContextVK(FfxInterface* backendInterface, FfxEffect ef
         descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         descriptorPoolCreateInfo.pNext = nullptr;
         descriptorPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-        descriptorPoolCreateInfo.poolSizeCount = 5;
+        // Six entries, so six is the count. A hard-coded 5 dropped the last one,
+        // VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, and the pool was created with no
+        // storage-buffer capacity at all. The FSR3 upscaler declares no buffer
+        // resources and never noticed; frame interpolation declares FI_Counters as a
+        // buffer, and on a driver that does not return VK_ERROR_OUT_OF_POOL_MEMORY the
+        // allocation appears to succeed, the descriptor is unbacked, and every
+        // generated frame is black behind a clean return code.
+        descriptorPoolCreateInfo.poolSizeCount = (uint32_t)FFX_ARRAY_ELEMENTS(poolSizes);
         descriptorPoolCreateInfo.pPoolSizes = poolSizes;
         descriptorPoolCreateInfo.maxSets = backendContext->maxEffectContexts * FFX_MAX_PASS_COUNT * MAX_PIPELINE_USAGE_PER_FRAME * FFX_MAX_QUEUED_FRAMES;
 
