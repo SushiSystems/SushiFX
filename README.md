@@ -6,9 +6,13 @@ A fork of the AMD FidelityFX SDK that keeps its Vulkan backend alive.
 backend, the samples and the Cauldron framework come along because they are part of the tree
 AMD published, but they are not maintained here.
 
-**Status:** nothing has been built yet. The first question this project has to answer is
-whether the Vulkan backend compiles from source at all, shaders included. Until that is
-answered, treat every claim below as intent.
+**Status:** the Vulkan backend configures under a non-Visual-Studio generator and builds
+`amd_fidelityfx_vk.dll` from source. The descriptor pool defect described below is fixed in
+`sdk/src/backends/vk/ffx_vk.cpp`, and commit `0457c0a` records the check in the built binary.
+The DirectX 12 backend, the samples and Radeon hardware are unverified.
+
+`PrebuiltSignedDLL/` holds AMD's signed binaries unchanged. Its Vulkan DLL still carries the
+defect, so build from source for Vulkan.
 
 ## Why it exists
 
@@ -21,8 +25,8 @@ v1.1.4 in May 2025. That is the commit this fork starts from.
 A Vulkan engine that wants FSR 3.1 therefore depends on a subtree its upstream no longer
 carries on any branch. That is the gap this fork fills.
 
-There is also a specific defect to fix. `sdk/src/backends/vk/ffx_vk.cpp` builds a six-entry
-`VkDescriptorPoolSize` array and then sets `poolSizeCount = 5`. The sixth entry is
+The fork also fixes a specific defect. Upstream's `sdk/src/backends/vk/ffx_vk.cpp` builds a
+six-entry `VkDescriptorPoolSize` array and then sets `poolSizeCount = 5`. The sixth entry is
 `VK_DESCRIPTOR_TYPE_STORAGE_BUFFER`, so the pool is created with no storage-buffer capacity.
 The FSR3 upscaler declares no buffer resources and works; frame interpolation declares
 `FI_Counters` as a buffer, and on drivers that do not return `VK_ERROR_OUT_OF_POOL_MEMORY` the
@@ -37,6 +41,11 @@ The import commit is AMD's tree exactly as published at the `v1.1.4` tag, upstre
 `c6efa6bf7f2027b3ec94f28578bb5965eabb9e55`, released May 2025. Every commit above it is local
 work, so `git diff` against that commit is the complete list of what this fork changes.
 
+The import leaves out the 49 files this repository's `.gitignore` excludes: the binaries and
+libraries under the `bin/`, `lib/` and `x64/` folders of `framework/cauldron/framework/libs`,
+`sdk/libs` and `sdk/tools/ffx_shader_compiler/libs`, about 216 MB. A clone cannot rebuild the
+shader compiler until those are fetched from AMD's release.
+
 ## Hardware
 
 Developed and tested on NVIDIA Ampere. No RDNA hardware is available to this project, so
@@ -47,7 +56,12 @@ all.
 ## Licence and attribution
 
 Upstream is MIT and stays MIT; see [LICENSE.txt](LICENSE.txt), which is AMD's and is not to be
-removed or replaced. Changes made here are MIT as well.
+removed or replaced. Changes made here are MIT as well, Copyright (c) 2026 Sushi Systems. The
+files they touch keep AMD's header unchanged, and no Sushi Systems license block is written
+into this tree.
+
+The DirectX Shader Compiler, Agility SDK and PIX binaries under the `libs/` folders are
+Microsoft's, under the terms in the `LICENSE-MS.txt` files beside them.
 
 AMD, FidelityFX and the AMD marks belong to Advanced Micro Devices, Inc. This project is not
 affiliated with AMD, is not endorsed by AMD, and does not speak for it. Vulkan is a registered
