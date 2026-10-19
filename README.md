@@ -1,71 +1,73 @@
 # SushiFX
 
-A fork of the AMD FidelityFX SDK that keeps its Vulkan backend alive.
+A fork of the AMD FidelityFX SDK that keeps its Vulkan backend alive, for engines that want FSR 3.1 upscaling and frame interpolation on Vulkan.
 
-**Scope:** FSR 3.1 upscaling and frame interpolation, on Vulkan. Nothing else. The DirectX 12
-backend, the samples and the Cauldron framework come along because they are part of the tree
-AMD published, but they are not maintained here.
+Everything else in the tree (the DirectX 12 backend, the samples, the Cauldron framework) is AMD's code as published. It is not maintained here.
 
-**Status:** the Vulkan backend configures under a non-Visual-Studio generator and builds
-`amd_fidelityfx_vk.dll` from source. The descriptor pool defect described below is fixed in
-`sdk/src/backends/vk/ffx_vk.cpp`, and commit `0457c0a` records the check in the built binary.
-The DirectX 12 backend, the samples and Radeon hardware are unverified.
+## What you get
 
-`PrebuiltSignedDLL/` holds AMD's signed binaries unchanged. Its Vulkan DLL still carries the
-defect, so build from source for Vulkan.
+| You take | From |
+| --- | --- |
+| `amd_fidelityfx_vk.dll`, built from source | `ffx-api/bin/`, after the build below |
+| The five-function C API (`ffxCreateContext`, `ffxDestroyContext`, `ffxDispatch`, `ffxQuery`, `ffxConfigure`) | `ffx-api/include/ffx_api/`, described in [ffx-api.md](docs/getting-started/ffx-api.md) |
+
+Do not use `PrebuiltSignedDLL/amd_fidelityfx_vk.dll`. It is AMD's signed binary, unchanged, and it
+carries the descriptor pool defect below.
+
+## Build
+
+Needs Windows, the Vulkan SDK, CMake and Ninja. A clone cannot rebuild the shader compiler until
+the ignored binaries under `sdk/tools/ffx_shader_compiler/libs` are fetched from AMD's release.
+
+```
+cmake -S ffx-api -B build/api -G Ninja -DCMAKE_BUILD_TYPE=Release -DFFX_API_BACKEND=VK_X64
+cmake --build build/api
+```
+
+The repository has no test suite and no project CLI yet.
 
 ## Why it exists
 
-AMD's FSR SDK moved to a v2 line, and that line is DirectX 12 only. Its readme lists
-"Vulkan is currently not supported in SDK" among the known issues, and the public tree carries
-`Kits/FidelityFX/backend/dx12` with no Vulkan sibling and six signed DirectX 12 DLLs with no
-Vulkan counterpart. The Vulkan backend exists only in the 1.1.x line, whose last release was
-v1.1.4 in May 2025. That is the commit this fork starts from.
+AMD's FSR SDK moved to a v2 line that is DirectX 12 only. Its readme lists "Vulkan is currently
+not supported in SDK" among the known issues. The Vulkan backend survives only in the 1.1.x line,
+whose last release is v1.1.4 (May 2025). This fork starts from that tag, upstream commit
+`c6efa6bf7f2027b3ec94f28578bb5965eabb9e55`, imported unchanged as `e5005fe`. `git diff e5005fe`
+lists everything the fork changes.
 
-A Vulkan engine that wants FSR 3.1 therefore depends on a subtree its upstream no longer
-carries on any branch. That is the gap this fork fills.
+The import leaves out the 49 files `.gitignore` excludes: the binaries and libraries under the
+`bin/`, `lib/` and `x64/` folders of `framework/cauldron/framework/libs`, `sdk/libs` and
+`sdk/tools/ffx_shader_compiler/libs`, about 216 MB.
 
-The fork also fixes a specific defect. Upstream's `sdk/src/backends/vk/ffx_vk.cpp` builds a
-six-entry `VkDescriptorPoolSize` array and then sets `poolSizeCount = 5`. The sixth entry is
-`VK_DESCRIPTOR_TYPE_STORAGE_BUFFER`, so the pool is created with no storage-buffer capacity.
-The FSR3 upscaler declares no buffer resources and works; frame interpolation declares
-`FI_Counters` as a buffer, and on drivers that do not return `VK_ERROR_OUT_OF_POOL_MEMORY` the
-allocation appears to succeed, the descriptor is unbacked, and every generated frame is black
-with a clean return code. The same instruction sequence is present in the signed
-`amd_fidelityfx_vk.dll`, at RVA `0x18001e232`, which is why the fix cannot come from outside
-the library.
+### The descriptor pool defect
 
-## Where this starts
+`sdk/src/backends/vk/ffx_vk.cpp` builds a six-entry `VkDescriptorPoolSize` array and sets
+`poolSizeCount = 5`. The sixth entry is `VK_DESCRIPTOR_TYPE_STORAGE_BUFFER`, so the pool has no
+storage-buffer capacity. The FSR3 upscaler declares no buffer resources and works. Frame
+interpolation declares `FI_Counters` as a buffer; on drivers that do not return
+`VK_ERROR_OUT_OF_POOL_MEMORY` the allocation appears to succeed, the descriptor is unbacked, and
+every generated frame is black with a clean return code. The signed DLL contains the same
+instruction sequence at RVA `0x18001e232`, so the fix has to come from the library source.
+Commit `0457c0a` fixes it.
 
-The import commit is AMD's tree exactly as published at the `v1.1.4` tag, upstream commit
-`c6efa6bf7f2027b3ec94f28578bb5965eabb9e55`, released May 2025. Every commit above it is local
-work, so `git diff` against that commit is the complete list of what this fork changes.
+## Status
 
-The import leaves out the 49 files this repository's `.gitignore` excludes: the binaries and
-libraries under the `bin/`, `lib/` and `x64/` folders of `framework/cauldron/framework/libs`,
-`sdk/libs` and `sdk/tools/ffx_shader_compiler/libs`, about 216 MB. A clone cannot rebuild the
-shader compiler until those are fetched from AMD's release.
+The Vulkan backend configures under Ninja and builds `amd_fidelityfx_vk.dll` from source. The
+DirectX 12 backend, the samples and Radeon hardware are unverified: development and testing run
+on NVIDIA Ampere, and reports from RDNA are welcome. The open findings are in the
+[estate audit](docs/agent/2026_10_05_ESTATE_AUDIT/REPORT.md).
 
-## Hardware
+## Documentation
 
-Developed and tested on NVIDIA Ampere. No RDNA hardware is available to this project, so
-results on Radeon parts are unverified and reports are welcome. FSR is vendor-agnostic by
-design, which is the reason a fork maintained on the wrong vendor's card is worth anything at
-all.
+[docs/index.md](docs/index.md) is AMD's manual, kept as published. AMD's original readme is
+[UPSTREAM_README.md](UPSTREAM_README.md), renamed because `readme.md` and `README.md` cannot
+coexist on a case-insensitive filesystem.
 
-## Licence and attribution
+## Licence
 
-Upstream is MIT and stays MIT; see [LICENSE.txt](LICENSE.txt), which is AMD's and is not to be
-removed or replaced. Changes made here are MIT as well, Copyright (c) 2026 Sushi Systems. The
-files they touch keep AMD's header unchanged, and no Sushi Systems license block is written
-into this tree.
-
-The DirectX Shader Compiler, Agility SDK and PIX binaries under the `libs/` folders are
-Microsoft's, under the terms in the `LICENSE-MS.txt` files beside them.
+MIT, in [LICENSE.txt](LICENSE.txt). The file is AMD's and stays as it is. Changes made here are
+MIT as well, Copyright (c) 2026 Sushi Systems, and the files they touch keep AMD's header. The
+DirectX Shader Compiler, Agility SDK and PIX binaries under the `libs/` folders are Microsoft's,
+under the `LICENSE-MS.txt` files beside them.
 
 AMD, FidelityFX and the AMD marks belong to Advanced Micro Devices, Inc. This project is not
-affiliated with AMD, is not endorsed by AMD, and does not speak for it. Vulkan is a registered
-trademark of the Khronos Group Inc.
-
-AMD's original readme is preserved as [UPSTREAM_README.md](UPSTREAM_README.md), renamed only
-because `readme.md` and `README.md` cannot coexist on a case-insensitive filesystem.
+affiliated with or endorsed by AMD. Vulkan is a registered trademark of the Khronos Group Inc.
