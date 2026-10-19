@@ -1,0 +1,54 @@
+name: upstream-sync
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK.git
+          git fetch upstream --tags --no-recurse-submodules
+
+      - name: List upstream releases this fork has not seen
+        run: |
+          git ls-remote --tags --refs origin | sed 's|.*refs/tags/||' | sort > seen.txt
+          git tag -l 'v[0-9]*' --sort=v:refname > all.txt
+          grep -vxFf seen.txt all.txt > new.txt || true
+          cat new.txt
+
+      - name: Open one issue per new release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          while read -r tag; do
+            prev=$(grep -x -B1 "$tag" all.txt | head -n1)
+            [ "$prev" = "$tag" ] && continue
+            {
+              echo "Upstream released \`$tag\`. Changes under \`Kits/\` since \`$prev\`:"
+              echo
+              echo '```'
+              git diff --stat=120 "$prev" "$tag" -- Kits | tail -n 40
+              echo '```'
+              echo
+              echo "Full diff: \`git diff $prev $tag -- Kits\`"
+            } > body.md
+            gh issue create --title "Upstream $tag" --label upstream-sync --body-file body.md
+          done < new.txt
+
+      - name: Mirror upstream main and its tags
+        run: |
+          git push origin upstream/main:refs/heads/upstream-main
+          git push origin --tags
